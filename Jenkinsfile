@@ -15,7 +15,7 @@ pipeline {
             steps {
                 script {
                     // Build the Docker image
-                    sh "docker build -t ${DOCKER_IMAGE} ."
+                    sh "sudo docker build -t ${DOCKER_IMAGE} ."
                 }
             }
         }
@@ -24,7 +24,7 @@ pipeline {
             steps {
                 script {
                     // Bring down existing containers if necessary
-                    sh "docker-compose down"
+                    sh "sudo docker-compose down"
 
                     // Create .env file dynamically
                     writeFile file: '.env', text: """
@@ -36,7 +36,7 @@ pipeline {
                     """
 
                     // Run Docker Compose
-                    sh "docker-compose up -d --build"
+                    sh "sudo docker-compose up -d --build"
                 }
             }
         }
