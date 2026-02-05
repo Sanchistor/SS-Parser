@@ -31,8 +31,8 @@ def approve_kb(apt_id):
 async def start(msg: Message):
     kb = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton("/approved")],
-            [KeyboardButton("/show"), KeyboardButton("/clear_filters")],
+            [KeyboardButton(text="/approved")],
+            [KeyboardButton(text="/show"), KeyboardButton(text="/clear_filters")],
         ],
         resize_keyboard=True,
     )
