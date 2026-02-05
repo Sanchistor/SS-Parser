@@ -1,0 +1,10 @@
+aiogram==3.*
+requests
+beautifulsoup4
+haversine
+sqlalchemy
+aiosqlite
+asyncpg
+playwright
+shapely
+lxml
