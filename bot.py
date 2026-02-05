@@ -8,7 +8,7 @@ from config import BOT_TOKEN
 from db import init_db, Session
 from models import Apartment
 from filters import user_filters
-from cron_task import cron_parser
+from cron_task import cron_parser, filters_ready
 from sqlalchemy import select
 
 router = Router()
@@ -43,6 +43,11 @@ async def set_point(msg: Message):
     user_filters["lon"] = float(lon)
     logger.info("User %s set point to %s,%s", getattr(msg.from_user, 'id', 'unknown'), lat, lon)
     logger.info("Current filters: %s", user_filters)
+    # wake the cron loop so scraping can start immediately
+    try:
+        filters_ready.set()
+    except Exception:
+        logger.exception("Failed to set filters_ready event")
     await msg.answer("📍 Точка обновлена")
 
 @router.message(Command("set_price"))
@@ -52,6 +57,10 @@ async def set_price(msg: Message):
     user_filters["price_max"] = int(mx)
     logger.info("User %s set price range %s-%s", getattr(msg.from_user, 'id', 'unknown'), mn, mx)
     logger.info("Current filters: %s", user_filters)
+    try:
+        filters_ready.set()
+    except Exception:
+        logger.exception("Failed to set filters_ready event")
     await msg.answer("💰 Цена обновлена")
 
 @router.message(Command("set_floor"))
@@ -61,7 +70,19 @@ async def set_floor(msg: Message):
     user_filters["floor_max"] = int(mx)
     logger.info("User %s set floor range %s-%s", getattr(msg.from_user, 'id', 'unknown'), mn, mx)
     logger.info("Current filters: %s", user_filters)
+    try:
+        filters_ready.set()
+    except Exception:
+        logger.exception("Failed to set filters_ready event")
     await msg.answer("🏢 Этаж обновлён")
+
+
+@router.message(Command("clear_filters"))
+async def clear_filters(msg: Message):
+    user_filters.clear()
+    logger.info("User %s cleared filters", getattr(msg.from_user, 'id', 'unknown'))
+    # Do not set filters_ready; cron loop will wait until filters are set again
+    await msg.answer("Filters cleared. Please set /set_point, /set_price and /set_floor to start scraping.")
 
 @router.message(Command("show"))
 async def show(msg: Message):

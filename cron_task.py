@@ -13,13 +13,14 @@ FOUR_HOURS = 4 * 60 * 60
 logger = logging.getLogger(__name__)
 
 scraper = SsMapScraper()
+filters_ready = asyncio.Event()
 
 
 async def cron_parser():
     """Main cron loop: runs the blocking map scraper in a thread and stores new flats."""
     while True:
         try:
-            # Wait until required user filters are set before scraping
+            # Wait until required user filters are set before scraping.
             required = [
                 "lat",
                 "lon",
@@ -28,11 +29,18 @@ async def cron_parser():
                 "floor_min",
                 "floor_max",
             ]
+            # keep checking until all required filters are present; we wait on
             missing = [k for k in required if k not in user_filters]
-            if missing:
+            while missing:
                 logger.info("Waiting for user filters to be set, missing: %s", missing)
-                await asyncio.sleep(30)
-                continue
+                try:
+                    await asyncio.wait_for(filters_ready.wait(), timeout=30)
+
+                    filters_ready.clear()
+                except asyncio.TimeoutError:
+                    #re-check missing keys and loop
+                    pass
+                missing = [k for k in required if k not in user_filters]
 
             logger.info("Starting map scrape")
             flats = await asyncio.to_thread(scraper.scrape)
@@ -58,7 +66,7 @@ async def cron_parser():
                     )
 
                     # scrape_description is synchronous/blocking - run in thread
-                    description = await asyncio.to_thread(scrape_description, flat.url)
+                    # description = await asyncio.to_thread(scrape_description, flat.url)
 
                     session.add(
                         Apartment(
@@ -68,7 +76,7 @@ async def cron_parser():
                             lat=flat.lat,
                             lon=flat.lon,
                             distance=distance,
-                            description=description,
+                            # description=description,
                             url=flat.url,
                             approved=False,
                         )

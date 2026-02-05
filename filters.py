@@ -1,8 +1,4 @@
-user_filters = {
-    "price_min": 0,
-    "price_max": 10_000,
-    "floor_min": 0,
-    "floor_max": 50,
-    "lat": 56.9496,
-    "lon": 24.1052
-}
+# Start with empty filters so scraping won't run until the user sets preferences
+# The bot handlers populate this dict when the user issues /set_point, /set_price
+# and /set_floor commands.
+user_filters = {}
