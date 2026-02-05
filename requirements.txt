@@ -8,3 +8,4 @@ asyncpg
 playwright
 shapely
 lxml
+psycopg2-binary
