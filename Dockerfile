@@ -20,8 +20,8 @@ RUN apt-get update \
 		libxdamage1 \
 		libgbm1 \
 		libgtk-3-0 \
-		libpangocairo-1.0-0 \
-		libgdk-pixbuf2.0-0 \
+	libpangocairo-1.0-0 \
+	libgdk-pixbuf-xlib-2.0-0 \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN pip install -r requirements.txt
