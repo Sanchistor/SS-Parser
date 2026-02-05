@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     environment {
+        DOCKER_IMAGE = "telegram-bot-scraper:latest"
         BOT_TOKEN = credentials('telegram-bot-token')
         POSTGRES_DB = credentials('database-name-staging')
         POSTGRES_USER = credentials('database-user-staging')
