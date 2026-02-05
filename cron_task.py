@@ -46,9 +46,19 @@ async def cron_parser():
             flats = await asyncio.to_thread(scraper.scrape)
             logger.info("Map scrape complete, found %d markers", len(flats))
 
+            # Ignore markers that don't have an external_id/url — these
+            # come from malformed marker entries where _build_url returned "".
+            valid_flats = [f for f in flats if f.external_id]
+            skipped = len(flats) - len(valid_flats)
+            if skipped:
+                logger.warning("Skipping %d markers with empty external_id/url", skipped)
+
             added = 0
             async with Session() as session:
                 for flat in flats:
+                    if not flat.external_id:
+                        # already counted in skipped above
+                        continue
                     exists = await session.execute(
                         select(Apartment).where(
                             Apartment.external_id == flat.external_id

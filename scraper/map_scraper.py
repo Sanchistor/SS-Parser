@@ -141,6 +141,13 @@ class SsMapScraper:
 
     def _build_url(self, elements: list[str]) -> str:
         for el in elements:
+            # Try to extract href="..." robustly
+            m = re.search(r'href\s*=\s*"([^"]+)"', el)
+            if m:
+                return "https://www.ss.com" + m.group(1)
+            # Fallback: original brittle parse
             if "href=" in el:
-                return "https://www.ss.com" + el.split('"')[1]
+                parts = el.split('"')
+                if len(parts) > 1:
+                    return "https://www.ss.com" + parts[1]
         return ""

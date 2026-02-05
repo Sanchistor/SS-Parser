@@ -86,6 +86,7 @@ async def clear_filters(msg: Message):
 
 @router.message(Command("show"))
 async def show(msg: Message):
+    logger.info("User %s requested show with filters=%s", getattr(msg.from_user, 'id', 'unknown'), user_filters)
     async with Session() as session:
         q = select(Apartment).where(
             Apartment.price >= user_filters["price_min"],
@@ -95,16 +96,31 @@ async def show(msg: Message):
         ).order_by(Apartment.distance.asc())
 
         res = await session.execute(q)
+        apts = res.scalars().all()
+        logger.info("Query returned %d apartments", len(apts))
 
-        for apt in res.scalars():
-            await msg.answer(
-                f"🏠 {apt.price} €\n"
-                f"🏢 этаж {apt.floor}\n"
-                f"📍 {int(apt.distance)} м\n\n"
-                f"{apt.description[:800]}\n\n"
-                f"{apt.url}",
-                reply_markup=approve_kb(apt.id)
-            )
+        if not apts:
+            await msg.answer("No apartments found for your filters.")
+            return
+
+        # limit flood of messages — send at most 20 at once
+        max_send = 20
+        if len(apts) > max_send:
+            await msg.answer(f"Found {len(apts)} apartments, showing first {max_send}...")
+
+        for apt in apts[:max_send]:
+            try:
+                distance_text = f"{int(apt.distance)} м" if apt.distance is not None else "N/A"
+                text = (
+                    f"🏠 {apt.price} €\n"
+                    f"🏢 этаж {apt.floor}\n"
+                    f"📍 {distance_text}\n\n"
+                    f"{apt.description[:800]}\n\n"
+                    f"{apt.url}"
+                )
+                await msg.answer(text, reply_markup=approve_kb(apt.id))
+            except Exception:
+                logger.exception("Failed to send apartment %s to user %s", apt.id, getattr(msg.from_user, 'id', 'unknown'))
 
 @router.callback_query(F.data.startswith("approve:"))
 async def approve(cb):
