@@ -115,7 +115,6 @@ async def show(msg: Message):
                     f"🏠 {apt.price} €\n"
                     f"🏢 этаж {apt.floor}\n"
                     f"📍 {distance_text}\n\n"
-                    f"{apt.description[:800]}\n\n"
                     f"{apt.url}"
                 )
                 await msg.answer(text, reply_markup=approve_kb(apt.id))
