@@ -12,6 +12,7 @@ from scraper.types import ApartmentDTO
 
 class SsMapScraper:
     def __init__(self):
+        logging.getLogger(__name__).info("Initializing SsMapScraper, loading bad regions and cookies")
         self.url = (
             "https://www.ss.com/ru/fTgTeF4QAzt4FD4eFFM=.html?map=17020&map2=17020&cat=14195&mode=3"
         )
@@ -26,13 +27,18 @@ class SsMapScraper:
             self.bad_regions = [
                 shape(feature["geometry"]) for feature in geojson["features"]
             ]
+            logging.getLogger(__name__).info(
+                "Loaded %d bad regions from bad_regions.geojson", len(self.bad_regions)
+            )
         except FileNotFoundError:
             # If the geojson isn't present, don't fail - treat as no bad regions.
             self.bad_regions = []
+            logging.getLogger(__name__).info("bad_regions.geojson not found, continuing without exclusions")
 
         self.cookies = self._get_cookies()
 
     def _get_cookies(self):
+        logging.getLogger(__name__).info("Retrieving cookies via Playwright")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
@@ -41,14 +47,18 @@ class SsMapScraper:
             cookies = context.cookies()
             page.close()
             browser.close()
+            logging.getLogger(__name__).debug("Playwright returned %d cookies", len(cookies))
             # find PHPSESSID cookie safely
             for c in cookies:
                 if c.get("name") == "PHPSESSID":
+                    logging.getLogger(__name__).info("Found PHPSESSID cookie")
                     return {"PHPSESSID": c.get("value")}
-            
+
+            logging.getLogger(__name__).warning("PHPSESSID cookie not found; requests may be unauthenticated")
             return {}
 
     def scrape(self) -> list[ApartmentDTO]:
+        logging.getLogger(__name__).info("Requesting map data URL %s", self.url)
         response = requests.get(self.url, cookies=self.cookies)
         match = re.search(
             r"var\s+MARKER_DATA\s*=\s*(\[.*?\]);",
@@ -86,15 +96,24 @@ class SsMapScraper:
 
             lat, lon, *_ = elements[0].split("|")
             address = elements[1]
-            rooms = int(elements[2].split(" ")[1])
+            # parse numeric fields safely; skip entry on parse errors
+            try:
+                rooms = int(elements[2].split(" ")[1])
 
-            floor_raw = elements[4].split(" ")[1].split("/")
-            floor = int(floor_raw[0])
-            total_floors = int(floor_raw[1])
+                floor_raw = elements[4].split(" ")[1].split("/")
+                # floor_raw may contain '-' or other non-numeric markers
+                floor = int(floor_raw[0])
+                total_floors = int(floor_raw[1])
 
-            price = int(elements[6].split(" ")[1].replace(",", ""))
+                price = int(elements[6].split(" ")[1].replace(",", ""))
+            except (ValueError, IndexError) as e:
+                logging.getLogger(__name__).debug(
+                    "Skipping flat due to parse error: %s; elements=%s", e, elements
+                )
+                continue
 
             if not self._valid_neighbourhood(lat, lon):
+                logging.getLogger(__name__).debug("Flat at %s,%s excluded by bad regions", lat, lon)
                 continue
 
             url = self._build_url(elements)
@@ -113,6 +132,7 @@ class SsMapScraper:
                 )
             )
 
+        logging.getLogger(__name__).info("Scrape complete, returning %d valid flats", len(flats))
         return flats
 
     def _valid_neighbourhood(self, lat: str, lon: str) -> bool:

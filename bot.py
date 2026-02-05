@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
@@ -11,6 +12,14 @@ from cron_task import cron_parser
 from sqlalchemy import select
 
 router = Router()
+
+# configure logging early so imports that run work (cron_task may run on import)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 def approve_kb(apt_id):
     return InlineKeyboardMarkup(inline_keyboard=[[
@@ -32,6 +41,8 @@ async def set_point(msg: Message):
     _, lat, lon = msg.text.split()
     user_filters["lat"] = float(lat)
     user_filters["lon"] = float(lon)
+    logger.info("User %s set point to %s,%s", getattr(msg.from_user, 'id', 'unknown'), lat, lon)
+    logger.info("Current filters: %s", user_filters)
     await msg.answer("📍 Точка обновлена")
 
 @router.message(Command("set_price"))
@@ -39,6 +50,8 @@ async def set_price(msg: Message):
     _, mn, mx = msg.text.split()
     user_filters["price_min"] = int(mn)
     user_filters["price_max"] = int(mx)
+    logger.info("User %s set price range %s-%s", getattr(msg.from_user, 'id', 'unknown'), mn, mx)
+    logger.info("Current filters: %s", user_filters)
     await msg.answer("💰 Цена обновлена")
 
 @router.message(Command("set_floor"))
@@ -46,6 +59,8 @@ async def set_floor(msg: Message):
     _, mn, mx = msg.text.split()
     user_filters["floor_min"] = int(mn)
     user_filters["floor_max"] = int(mx)
+    logger.info("User %s set floor range %s-%s", getattr(msg.from_user, 'id', 'unknown'), mn, mx)
+    logger.info("Current filters: %s", user_filters)
     await msg.answer("🏢 Этаж обновлён")
 
 @router.message(Command("show"))
@@ -90,10 +105,12 @@ async def reject(cb):
     await cb.message.delete()
 
 async def main():
+    logger.info("Initializing database")
     await init_db()
     bot = Bot(BOT_TOKEN)
     dp = Dispatcher()
     dp.include_router(router)
+    logger.info("Starting cron parser task")
     asyncio.create_task(cron_parser())
     await dp.start_polling(bot)
 
