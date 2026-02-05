@@ -2,6 +2,8 @@ import html
 import json
 import re
 import requests
+import logging
+from json import JSONDecodeError
 from playwright.sync_api import sync_playwright
 from shapely.geometry import Point, shape
 
@@ -57,7 +59,18 @@ class SsMapScraper:
         if not match:
             return []
 
-        marker_data = json.loads(match.group(1))
+        raw = match.group(1)
+        try:
+            marker_data = json.loads(raw)
+        except JSONDecodeError:
+            try:
+                fixed = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
+                marker_data = json.loads(fixed)
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    "Failed to decode MARKER_DATA JSON; skipping map scrape"
+                )
+                return []
         flats: list[ApartmentDTO] = []
 
         for raw in marker_data:
