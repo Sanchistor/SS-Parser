@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from scraper.map_scraper import SsMapScraper
-from scraper.card_scraper import scrape_description
 from db import Session
 from models import Apartment
 from utils import calc_distance
@@ -38,7 +37,6 @@ async def cron_parser():
 
                     filters_ready.clear()
                 except asyncio.TimeoutError:
-                    #re-check missing keys and loop
                     pass
                 missing = [k for k in required if k not in user_filters]
 
@@ -46,8 +44,7 @@ async def cron_parser():
             flats = await asyncio.to_thread(scraper.scrape)
             logger.info("Map scrape complete, found %d markers", len(flats))
 
-            # Ignore markers that don't have an external_id/url — these
-            # come from malformed marker entries where _build_url returned "".
+            # Ignore markers that don't have an external_id/url
             valid_flats = [f for f in flats if f.external_id]
             skipped = len(flats) - len(valid_flats)
             if skipped:
@@ -57,7 +54,6 @@ async def cron_parser():
             async with Session() as session:
                 for flat in flats:
                     if not flat.external_id:
-                        # already counted in skipped above
                         continue
                     exists = await session.execute(
                         select(Apartment).where(
@@ -75,8 +71,6 @@ async def cron_parser():
                         flat.lon,
                     )
 
-                    # scrape_description is synchronous/blocking - run in thread
-                    # description = await asyncio.to_thread(scrape_description, flat.url)
 
                     session.add(
                         Apartment(
@@ -86,7 +80,6 @@ async def cron_parser():
                             lat=flat.lat,
                             lon=flat.lon,
                             distance=distance,
-                            # description=description,
                             url=flat.url,
                             approved=False,
                         )

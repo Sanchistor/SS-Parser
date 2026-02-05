@@ -132,7 +132,6 @@ class SsMapScraper:
                 )
             )
 
-        # Log how many markers had a URL and show a small sample to help debugging
         urls = [f.external_id for f in flats if f.external_id]
         logging.getLogger(__name__).info(
             "Scrape complete, returning %d valid flats (%d with URL)", len(flats), len(urls)
