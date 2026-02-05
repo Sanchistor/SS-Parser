@@ -2,7 +2,7 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
 from config import BOT_TOKEN
 from db import init_db, Session
@@ -29,12 +29,60 @@ def approve_kb(apt_id):
 
 @router.message(Command("start"))
 async def start(msg: Message):
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(KeyboardButton("/approved"))
+    kb.row(KeyboardButton("/show"), KeyboardButton("/clear_filters"))
+
     await msg.answer(
         "/set_point lat lon\n"
         "/set_price min max\n"
         "/set_floor min max\n"
-        "/show"
+        "Use the menu buttons below to open approved listings or show current results.",
+        reply_markup=kb,
     )
+
+
+@router.message(Command("approved"))
+async def approved(msg: Message):
+    logger.info("User %s requested approved with filters=%s", getattr(msg.from_user, 'id', 'unknown'), user_filters)
+    async with Session() as session:
+        q = select(Apartment).where(Apartment.approved == True)
+
+        # If user filters are present, apply them
+        if all(k in user_filters for k in ("price_min", "price_max", "floor_min", "floor_max")):
+            q = q.where(
+                Apartment.price >= user_filters["price_min"],
+                Apartment.price <= user_filters["price_max"],
+                Apartment.floor >= user_filters["floor_min"],
+                Apartment.floor <= user_filters["floor_max"],
+            )
+
+        q = q.order_by(Apartment.distance.asc())
+
+        res = await session.execute(q)
+        apts = res.scalars().all()
+        logger.info("Approved query returned %d apartments", len(apts))
+
+        if not apts:
+            await msg.answer("No approved apartments found.")
+            return
+
+        max_send = 20
+        if len(apts) > max_send:
+            await msg.answer(f"Found {len(apts)} approved apartments, showing first {max_send}...")
+
+        for apt in apts[:max_send]:
+            try:
+                distance_text = f"{int(apt.distance)} м" if apt.distance is not None else "N/A"
+                text = (
+                    f"🏠 {apt.price} €\n"
+                    f"🏢 этаж {apt.floor}\n"
+                    f"📍 {distance_text}\n\n"
+                    f"{apt.url}"
+                )
+                await msg.answer(text)
+            except Exception:
+                logger.exception("Failed to send approved apartment %s to user %s", apt.id, getattr(msg.from_user, 'id', 'unknown'))
 
 @router.message(Command("set_point"))
 async def set_point(msg: Message):
