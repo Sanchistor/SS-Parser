@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "telegram-bot-scraper:latest"
+
         BOT_TOKEN = credentials('telegram-bot-token')
         POSTGRES_DB = credentials('database-name-staging')
         POSTGRES_USER = credentials('database-user-staging')
@@ -10,44 +11,40 @@ pipeline {
     }
 
     stages {
-        
+
         stage('Build Docker Image') {
             steps {
-                script {
-                    // Build the Docker image
-                    sh "sudo docker build -t ${DOCKER_IMAGE} ."
-                }
+                sh "docker build -t ${DOCKER_IMAGE} ."
             }
         }
 
-        stage('Deploy to Docker') {
+        stage('Deploy with Docker Compose') {
             steps {
                 script {
-                    // Bring down existing containers if necessary
-                    sh "sudo docker-compose down"
-
-                    // Create .env file dynamically
+                    // Create .env dynamically
                     writeFile file: '.env', text: """
-                    BOT_TOKEN=${BOT_TOKEN}
-                    POSTGRES_DB=${POSTGRES_DB}
-                    POSTGRES_USER=${POSTGRES_USER}
-                    POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-                    CONNECTION_STRING=Host=db;Database=${env.POSTGRES_DB};Username=${env.POSTGRES_USER};Password=${env.POSTGRES_PASSWORD};Port=5432;
-                    """
+BOT_TOKEN=${BOT_TOKEN}
+POSTGRES_DB=${POSTGRES_DB}
+POSTGRES_USER=${POSTGRES_USER}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+"""
 
-                    // Run Docker Compose
-                    sh "sudo docker-compose up -d --build"
+                    sh """
+                        docker-compose down || true
+                        docker-compose up -d --build
+                    """
                 }
             }
         }
-
     }
+
     post {
         success {
-            echo 'Pipeline execution completed successfully!'
+            echo '✅ Pipeline completed successfully'
         }
         failure {
-            echo 'Pipeline failed. Attempting to clean up resources...'
+            echo '❌ Pipeline failed'
         }
     }
 }
