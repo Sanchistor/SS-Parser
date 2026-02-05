@@ -29,9 +29,13 @@ def approve_kb(apt_id):
 
 @router.message(Command("start"))
 async def start(msg: Message):
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add(KeyboardButton("/approved"))
-    kb.row(KeyboardButton("/show"), KeyboardButton("/clear_filters"))
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton("/approved")],
+            [KeyboardButton("/show"), KeyboardButton("/clear_filters")],
+        ],
+        resize_keyboard=True,
+    )
 
     await msg.answer(
         "/set_point lat lon\n"
