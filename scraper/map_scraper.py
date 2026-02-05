@@ -132,7 +132,15 @@ class SsMapScraper:
                 )
             )
 
-        logging.getLogger(__name__).info("Scrape complete, returning %d valid flats", len(flats))
+        # Log how many markers had a URL and show a small sample to help debugging
+        urls = [f.external_id for f in flats if f.external_id]
+        logging.getLogger(__name__).info(
+            "Scrape complete, returning %d valid flats (%d with URL)", len(flats), len(urls)
+        )
+        if urls:
+            sample = urls[:10]
+            logging.getLogger(__name__).debug("Sample URLs: %s", sample)
+
         return flats
 
     def _valid_neighbourhood(self, lat: str, lon: str) -> bool:
@@ -144,10 +152,26 @@ class SsMapScraper:
             # Try to extract href="..." robustly
             m = re.search(r'href\s*=\s*"([^"]+)"', el)
             if m:
-                return "https://www.ss.com" + m.group(1)
-            # Fallback: original brittle parse
+                href = m.group(1)
+                if href.startswith("http"):
+                    return href
+                return "https://www.ss.com" + href
+
+            # Try to find a direct path to the listing, e.g. /msg/.../*.html
+            m2 = re.search(r'(/[^"\s\|<>]+?\.html)', el)
+            if m2:
+                path = m2.group(1)
+                if path.startswith("http"):
+                    return path
+                return "https://www.ss.com" + path
+
+            # Fallback: original brittle parse (keep for backward compatibility)
             if "href=" in el:
                 parts = el.split('"')
                 if len(parts) > 1:
-                    return "https://www.ss.com" + parts[1]
+                    href = parts[1]
+                    if href.startswith("http"):
+                        return href
+                    return "https://www.ss.com" + href
+
         return ""
