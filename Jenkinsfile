@@ -11,13 +11,6 @@ pipeline {
     }
 
     stages {
-
-        stage('Build Docker Image') {
-            steps {
-                sh "docker build -t ${DOCKER_IMAGE} ."
-            }
-        }
-
         stage('Deploy with Docker Compose') {
             steps {
                 script {
